@@ -130,6 +130,7 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(r.Host)
 	fmt.Println(r.Method)
 	fmt.Println(r.ContentLength)
+
 	fmt.Println("GET")
 
 	if err != nil {
