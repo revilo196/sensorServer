@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -13,7 +14,6 @@ import (
 
 var key = []byte{0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c,
 	0x3e, 0x05, 0xb6, 0x96, 0x55, 0xea, 0x2e, 0xae, 0xe9, 0xee, 0xf1, 0xa2, 0x2f, 0x13, 0x39, 0x99}
-
 
 func putHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -38,8 +38,10 @@ func putHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		iv := ciphertext[:aes.BlockSize]
 		ciphertext = ciphertext[aes.BlockSize:]
-		mode := cipher.NewCBCDecrypter(block, iv)
-		mode.CryptBlocks(ciphertext, ciphertext)
+		stream := cipher.NewCTR(block, iv)
+
+		//mode.CryptBlocks(ciphertext, ciphertext)
+		stream.XORKeyStream(ciphertext, ciphertext)
 		fmt.Println(ciphertext)
 
 		//#DECODE
@@ -68,8 +70,12 @@ func putHandler(w http.ResponseWriter, r *http.Request) {
 		valid := secure.CheckID(u)
 
 		fmt.Println(valid)
+		if valid {
+			fmt.Fprintf(w, "OK")
+		} else {
+			fmt.Fprintf(w, "DENIED")
 
-		fmt.Fprintf(w, "OK")
+		}
 		return
 	}
 	w.WriteHeader(405)
@@ -101,8 +107,12 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		//CREATE new Rand IDENTIFIER
+		secure.FilterOld()
 		newID := secure.AddNewIdent()
-		b:= newID.Id[:]
+		b := newID.Id[:]
+		bs := make([]byte, len(b)*4)
+		base64.StdEncoding.Encode(bs, b)
+		fmt.Println(b)
 		//Send IDENTIFIER
 		_, err := w.Write(b)
 		if err != nil {
@@ -111,7 +121,6 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-
 
 	w.WriteHeader(405)
 	_, err := fmt.Fprintf(w, "NOT ALLOWED")

@@ -28,6 +28,7 @@ func (ident Ident) equalID(id []byte) bool {
 }
 
 const TIMEOUT float64 = 30.0
+
 func (ident Ident) timeValid() bool {
 	return time.Now().Sub(ident.time).Seconds() < TIMEOUT
 }
@@ -36,15 +37,17 @@ type identList []Ident
 
 var ids = identList{}
 
-func (ids * identList) filterTimeouts() {
+func (ids *identList) filterTimeouts() {
 	for i := range *ids {
-		if ! (*ids)[i].timeValid() {
+		if !(*ids)[i].timeValid() {
 			*ids = (*ids)[:i+copy((*ids)[i:], (*ids)[i+1:])]
+			ids.filterTimeouts()
+			return
 		}
 	}
 }
 
-func (ids * identList) containsValid(id []byte) (bool, int) {
+func (ids *identList) containsValid(id []byte) (bool, int) {
 	for i := range *ids {
 		if (*ids)[i].equalID(id) && (*ids)[i].timeValid() {
 			*ids = (*ids)[:i+copy((*ids)[i:], (*ids)[+1:])]
@@ -54,10 +57,15 @@ func (ids * identList) containsValid(id []byte) (bool, int) {
 	return false, -1
 }
 
-func CheckID(id []byte) (bool) {
+func FilterOld() {
+	ids.filterTimeouts()
+	return
+}
+
+func CheckID(id []byte) bool {
 	ids.filterTimeouts()
 	bo, _ := ids.containsValid(id)
-	return  bo
+	return bo
 }
 
 func AddNewIdent() Ident {
