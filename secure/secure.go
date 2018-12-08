@@ -12,12 +12,12 @@ var key = []byte{0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x1
 	0x3e, 0x05, 0xb6, 0x96, 0x55, 0xea, 0x2e, 0xae, 0xe9, 0xee, 0xf1, 0xa2, 0x2f, 0x13, 0x39, 0x99}
 
 type Ident struct {
-	Id   [23]byte
+	Id   [15]byte
 	time time.Time
 }
 
 func (ident Ident) equalID(id []byte) bool {
-	if len(id) != 23 {
+	if len(id) != 15 {
 		return false
 	}
 	for i := range id {
@@ -70,7 +70,7 @@ func CheckID(id []byte) bool {
 }
 
 func AddNewIdent() Ident {
-	c := aes.BlockSize*2 - 9
+	c := aes.BlockSize - 1
 	b := make([]byte, c)
 	_, err := rand.Read(b)
 	if err != nil {
