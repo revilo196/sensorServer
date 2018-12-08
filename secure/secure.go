@@ -2,6 +2,7 @@ package secure
 
 import (
 	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"fmt"
 	"time"
@@ -82,4 +83,20 @@ func AddNewIdent() Ident {
 	ids = append(ids, newId)
 	fmt.Println(len(ids))
 	return newId
+}
+
+func Decrypt(ciphertext []byte) []byte {
+
+	//#DECRYPT
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err)
+	}
+	iv := ciphertext[:aes.BlockSize]
+	ciphertext = ciphertext[aes.BlockSize:]
+	stream := cipher.NewCTR(block, iv)
+
+	stream.XORKeyStream(ciphertext, ciphertext)
+	return ciphertext
+
 }
