@@ -3,19 +3,7 @@ package sensordata
 import (
 	"bytes"
 	"encoding/binary"
-	"math"
 )
-
-func Float32frombytes(bytes []byte) float32 {
-	bits := binary.LittleEndian.Uint32(bytes)
-	float := math.Float32frombits(bits)
-	return float
-}
-
-func uint64frombytes(bytes []byte) uint64 {
-	bits := binary.LittleEndian.Uint64(bytes)
-	return bits
-}
 
 func DecodeParsePackage(pack []byte) (int, []SensorWert) {
 	n := len(pack) / 16

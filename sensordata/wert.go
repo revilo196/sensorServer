@@ -24,7 +24,7 @@ func (s SensorWert) DivScalar(div int) SensorWert {
 	return s
 }
 
-func AddMeanSlice(werte []SensorWert) SensorWert {
+func MeanSlice(werte []SensorWert) SensorWert {
 	sum := SensorWert{0, 0, 0}
 
 	for i := range werte {

@@ -1,10 +1,12 @@
 package secure
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"fmt"
+	"golang.org/x/crypto/blake2s"
 	"time"
 )
 
@@ -98,5 +100,20 @@ func Decrypt(ciphertext []byte) []byte {
 
 	stream.XORKeyStream(ciphertext, ciphertext)
 	return ciphertext
+
+}
+
+func CheckHash(pack []byte) bool {
+	sumA := pack[len(pack)-16:]
+	pack = pack[:len(pack)-16]
+	hash, err := blake2s.New128(key[:16])
+	hash.Write(pack)
+	sumB := hash.Sum(nil)
+
+	if err != nil {
+		return false
+	}
+
+	return bytes.Equal(sumA, sumB)
 
 }

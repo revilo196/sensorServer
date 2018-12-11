@@ -1,94 +1,129 @@
 package main
 
 import (
+	"encoding/gob"
+	"encoding/json"
 	"fmt"
-	"golang.org/x/crypto/blake2s"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
+	"os"
 	"sensorServer/secure"
 	"sensorServer/sensordata"
+	"sensorServer/writemail"
+	"strconv"
+	"time"
 )
 
-var key = []byte{0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c,
-	0x3e, 0x05, 0xb6, 0x96, 0x55, 0xea, 0x2e, 0xae, 0xe9, 0xee, 0xf1, 0xa2, 0x2f, 0x13, 0x39, 0x99}
+var (
+	Trace   *log.Logger
+	Info    *log.Logger
+	Warning *log.Logger
+	Error   *log.Logger
+)
+
+func panicLogger() {
+	if r := recover(); r != nil {
+		Error.Printf("<h2>PANIC:</h2> %v", r)
+		panic(r)
+	}
+}
 
 func putHandler(w http.ResponseWriter, r *http.Request) {
-
+	defer panicLogger()
 	if r.Method == "PUT" {
 
 		//#READ INPUT
 		b := make([]byte, r.ContentLength)
 		n, err := r.Body.Read(b)
-
 		if err != nil && err != io.EOF {
-			fmt.Println("error:", err, n)
-			fmt.Println(b)
+			Error.Println("error:", err, n)
+			Error.Println(b)
 			return
 		}
 
 		//#DECRYPT
 		plaintext := secure.Decrypt(b)
 
-		//#DECODE
+		//CHECK HASH
+		valid := secure.CheckHash(plaintext)
+		if !valid {
+			fmt.Fprintf(w, "HASH")
+			return
+		}
+
+		//CHECK-IDENT
 		u := plaintext[:15]
+		valid = secure.CheckID(u)
+		if !valid {
+			fmt.Fprintf(w, "DENIED")
+			return
+		}
+
+		fmt.Fprintf(w, "OK")
+
 		sensornum := plaintext[15]
-		prufsumme := plaintext[len(plaintext)-16:]
 		pack := plaintext[:len(plaintext)-16]
 		values := pack[16:]
 
-		hash, err := blake2s.New128(key[:16])
-		hash.Write(pack)
-		bs := hash.Sum(nil)
-
-		for i := range bs {
-			if bs[i] != prufsumme[i] {
-				fmt.Fprintf(w, "HASH")
-				return
-			}
-		}
-
-		// U: IDENTIFIER  |  sensornum: Nummer des Sensors  |  f1,f2 Sensor Werte
+		// U: IDENTIFIER  |  sensornum: Nummer des Sensors
 		fmt.Println(u, sensornum)
-
-		valid := secure.CheckID(u)
-
-		fmt.Println(valid)
-		if valid {
-			fmt.Fprintf(w, "OK")
-			_, werts := sensordata.DecodeParsePackage(values)
-			fmt.Println(werts)
-		} else {
-			fmt.Fprintf(w, "DENIED")
-
-		}
+		_, werte := sensordata.DecodeParsePackage(values)
+		fmt.Println(werte)
+		sensordata.AddWertMult(int(sensornum), werte)
 		return
 	}
+
 	w.WriteHeader(405)
 	_, err := fmt.Fprintf(w, "NOT ALLOWED")
 
 	if err != nil {
-		fmt.Println("error:", err)
+		Error.Println("error:", err)
 		return
 	}
 
 }
 
 func getHandler(w http.ResponseWriter, r *http.Request) {
-	_, err := fmt.Fprintf(w, "<h1>Hello Internet</h1>")
+	defer panicLogger()
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fmt.Println(r.Host)
 	fmt.Println(r.Method)
-	fmt.Println(r.ContentLength)
-
+	fmt.Println(r.RequestURI)
 	fmt.Println("GET")
 
-	if err != nil {
-		fmt.Println("error:", err)
+	uri, err := url.ParseRequestURI(r.RequestURI)
+	query := uri.Query()
+
+	num, ok1 := query["n"]
+	tim, ok2 := query["t"]
+	del, ok3 := query["d"]
+
+	ti, _ := strconv.Atoi(tim[0])
+	delta, _ := strconv.Atoi(del[0])
+
+	te := time.Now().Unix()
+	ts := te - int64(ti)
+
+	if ok1 && ok2 && ok3 {
+
+		i, _ := strconv.Atoi(num[0])
+		bytes, _ := json.Marshal(sensordata.Summit(i, time.Unix(ts, 0), time.Unix(te, 0), delta))
+		w.Write(bytes)
+
 		return
 	}
 
+	if err != nil {
+		Error.Println("error:", err)
+		return
+	}
 }
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
+	defer panicLogger()
 
 	if r.Method == "GET" {
 		//CREATE new Rand IDENTIFIER
@@ -99,7 +134,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		//Send IDENTIFIER
 		_, err := w.Write(b)
 		if err != nil {
-			fmt.Println("error:", err)
+			Error.Println("error:", err)
 			return
 		}
 		return
@@ -108,21 +143,69 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(405)
 	_, err := fmt.Fprintf(w, "NOT ALLOWED")
 	if err != nil {
-		fmt.Println("error:", err)
+		Error.Println("error:", err)
 		return
 	}
 }
 
+func wakeHandler(w http.ResponseWriter, r *http.Request) {
+	defer panicLogger()
+
+	if r.Method == "PUT" {
+		b := make([]byte, r.ContentLength)
+		n, err := r.Body.Read(b)
+		if n > 0 && err == nil {
+			Warning.Printf("<h2>Sensor %v has Restarted</h2>", b[0])
+		}
+	}
+}
+
+func readMailAccountGob(filePath string, account *writemail.MailAccount) error {
+	file, err := os.Open(filePath)
+	if err == nil {
+		decoder := gob.NewDecoder(file)
+		err = decoder.Decode(account)
+	}
+	err = file.Close()
+	return err
+}
+
+func InitLogging() {
+
+	account := writemail.MailAccount{}
+	err := readMailAccountGob("account.gob", &account)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	msger := writemail.MailMsg{Account: account,
+		Name:    "Creapolis Server Log",
+		To:      []string{"XXX@web.de", "XXX@XXX.de", "XXX@XXXXde"},
+		Subject: "Server Log"}
+
+	Trace = log.New(msger, "<h1>Trace</h1>", log.LstdFlags|log.Llongfile)
+	Info = log.New(msger, "<h1>Info</h1>", log.LstdFlags|log.Llongfile)
+	Warning = log.New(msger, "<h1>Warning</h1>", log.LstdFlags|log.Llongfile)
+	Error = log.New(msger, "<h1>Error</h1>", log.LstdFlags|log.Llongfile)
+
+}
+
 func main() {
+	defer panicLogger()
+	sensordata.Init()
+	InitLogging()
+	Info.Printf("<h2>Sensor Log Server has Started</h2> Loaded %v datapoints from storage", sensordata.CountAll())
 
 	http.HandleFunc("/", http.NotFound)
 	http.HandleFunc("/put", putHandler)
 	http.HandleFunc("/key", keyHandler)
 	http.HandleFunc("/get", getHandler)
+	http.HandleFunc("/wake", wakeHandler)
 	err := http.ListenAndServe(":8000", nil)
 
 	if err != nil {
-		fmt.Println("error:", err)
+		Error.Println("error:", err)
 		return
 	}
 }
