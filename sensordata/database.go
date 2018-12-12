@@ -12,6 +12,8 @@ import (
 
 type Store [][]SensorWert
 
+
+
 const filename = "database.gob"
 
 var storage Store

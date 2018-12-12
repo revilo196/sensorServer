@@ -23,6 +23,8 @@ var (
 	Error   *log.Logger
 )
 
+var lastTimes []time.Time
+
 func panicLogger() {
 
 	if r := recover(); r != nil {
@@ -84,6 +86,9 @@ func putHandler(w http.ResponseWriter, r *http.Request) {
 		_, werte := sensordata.DecodeParsePackage(values, int(sensornum))
 		fmt.Println(werte)
 		sensordata.AddWertMult(int(sensornum), werte)
+
+		lastTimes[int(sensornum)] = time.Now()
+
 		return
 	}
 
@@ -212,8 +217,34 @@ func InitLogging() {
 
 }
 
+func CheckSensors()  {
+
+	for i :=  range lastTimes {
+		if time.Since(lastTimes[i]) > 4*time.Hour {
+
+			Error.Printf("<h2> Sensor %v Missing </h2> Last time online : %v \n Duration : %v ", i, lastTimes[i],time.Since(lastTimes[i]))
+
+		}
+	}
+
+}
+
 func main() {
 	defer panicLogger()
+	lastTimes = make([]time.Time,5)
+	for i:= range lastTimes {
+		lastTimes[i] = time.Now()
+	}
+
+	ticker := time.NewTicker(2* time.Hour);
+
+	go func() {
+		for t := range ticker.C {
+			fmt.Println("Tick at", t)
+			CheckSensors()
+		}
+	}()
+
 	sensordata.Init()
 	InitLogging()
 	//Info.Printf("<h2>Sensor Log Server has Started</h2> Loaded %v datapoints from storage", sensordata.CountAll())
