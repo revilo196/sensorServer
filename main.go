@@ -24,14 +24,17 @@ var (
 )
 
 func panicLogger() {
+
 	if r := recover(); r != nil {
 		Error.Printf("<h2>PANIC:</h2> %v", r)
 		panic(r)
 	}
+
 }
 
 func putHandler(w http.ResponseWriter, r *http.Request) {
 	defer panicLogger()
+
 	if r.Method == "PUT" {
 
 		//#READ INPUT
@@ -49,7 +52,10 @@ func putHandler(w http.ResponseWriter, r *http.Request) {
 		//CHECK HASH
 		valid := secure.CheckHash(plaintext)
 		if !valid {
-			fmt.Fprintf(w, "HASH")
+			_, err = fmt.Fprintf(w, "HASH")
+			if err != nil {
+				Error.Println("error:", err)
+			}
 			return
 		}
 
@@ -57,11 +63,17 @@ func putHandler(w http.ResponseWriter, r *http.Request) {
 		u := plaintext[:15]
 		valid = secure.CheckID(u)
 		if !valid {
-			fmt.Fprintf(w, "DENIED")
+			_, err = fmt.Fprintf(w, "DENIED")
+			if err != nil {
+				Error.Println("error:", err)
+			}
 			return
 		}
 
-		fmt.Fprintf(w, "OK")
+		_, err = fmt.Fprintf(w, "OK")
+		if err != nil {
+			Error.Println("error:", err)
+		}
 
 		sensornum := plaintext[15]
 		pack := plaintext[:len(plaintext)-16]
@@ -69,7 +81,7 @@ func putHandler(w http.ResponseWriter, r *http.Request) {
 
 		// U: IDENTIFIER  |  sensornum: Nummer des Sensors
 		fmt.Println(u, sensornum)
-		_, werte := sensordata.DecodeParsePackage(values)
+		_, werte := sensordata.DecodeParsePackage(values, int(sensornum))
 		fmt.Println(werte)
 		sensordata.AddWertMult(int(sensornum), werte)
 		return
@@ -107,12 +119,21 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 	te := time.Now().Unix()
 	ts := te - int64(ti)
 
+	data := make([]sensordata.SensorWert, 0)
+
 	if ok1 && ok2 && ok3 {
 
-		i, _ := strconv.Atoi(num[0])
-		bytes, _ := json.Marshal(sensordata.Summit(i, time.Unix(ts, 0), time.Unix(te, 0), delta))
-		w.Write(bytes)
+		for i := range num {
+			senNumber, _ := strconv.Atoi(num[i])
+			data = append(data, sensordata.Summit(senNumber, time.Unix(ts, 0), time.Unix(te, 0), delta)...)
+		}
 
+		bytes, _ := json.Marshal(data)
+		_, err = w.Write(bytes)
+
+		if err != nil {
+			Error.Println("error:", err)
+		}
 		return
 	}
 
@@ -181,7 +202,7 @@ func InitLogging() {
 
 	msger := writemail.MailMsg{Account: account,
 		Name:    "Creapolis Server Log",
-		To:      []string{"XXX@web.de", "XXX@XXX.de", "XXX@XXXXde"},
+		To:      []string{"oli1111@web.de", "oliver.walter@stud.hs-coburg.de", "Daniel.Melzer@stud.hs-coburg.de"},
 		Subject: "Server Log"}
 
 	Trace = log.New(msger, "<h1>Trace</h1>", log.LstdFlags|log.Llongfile)
@@ -195,7 +216,7 @@ func main() {
 	defer panicLogger()
 	sensordata.Init()
 	InitLogging()
-	Info.Printf("<h2>Sensor Log Server has Started</h2> Loaded %v datapoints from storage", sensordata.CountAll())
+	//Info.Printf("<h2>Sensor Log Server has Started</h2> Loaded %v datapoints from storage", sensordata.CountAll())
 
 	http.HandleFunc("/", http.NotFound)
 	http.HandleFunc("/put", putHandler)

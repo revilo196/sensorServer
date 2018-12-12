@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -14,6 +15,7 @@ type Store [][]SensorWert
 const filename = "database.gob"
 
 var storage Store
+var m sync.Mutex
 
 func Init() {
 	_, err := os.Stat(filename)
@@ -31,7 +33,9 @@ func Init() {
 			fmt.Println("Database Init Save Error")
 		}
 	} else {
+		m.Lock()
 		err := readGob(filename)
+		m.Unlock()
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("Database Init Load Error")
@@ -40,6 +44,7 @@ func Init() {
 }
 
 func AddWertMult(num int, wert []SensorWert) {
+
 	for i := range wert {
 		AddWert(num, wert[i])
 	}
@@ -50,12 +55,13 @@ func AddWert(num int, wert SensorWert) {
 	if num > 5 || num < 0 {
 		return
 	}
+	m.Lock()
 	storage[num] = append(storage[num], wert)
 
 	sort.Slice(storage[num], func(i, j int) bool {
 		return storage[num][i].Time < storage[num][j].Time
 	})
-
+	m.Unlock()
 	Save()
 }
 

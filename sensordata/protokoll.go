@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 )
 
-func DecodeParsePackage(pack []byte) (int, []SensorWert) {
+func DecodeParsePackage(pack []byte, num int) (int, []SensorWert) {
 	n := len(pack) / 16
 	values := make([]SensorWert, n)
 
@@ -19,7 +19,7 @@ func DecodeParsePackage(pack []byte) (int, []SensorWert) {
 		binary.Read(buf1, binary.LittleEndian, &f2)
 		binary.Read(buf1, binary.LittleEndian, &in)
 
-		values[i] = SensorWert{f1, f2, in}
+		values[i] = SensorWert{f1, f2, in, num}
 	}
 
 	return n, values
