@@ -207,7 +207,7 @@ func InitLogging() {
 
 	msger := writemail.MailMsg{Account: account,
 		Name:    "Creapolis Server Log",
-		To:      []string{"xxxx@xxxx.de", "xxxx.xxx@xx.xx-xx.de", "xx.xx@xx.xx-xxxx.de"},
+		To:      []string{"oli1111@web.de", "oliver.walter@stud.hs-coburg.de", "Daniel.Melzer@stud.hs-coburg.de"},
 		Subject: "Server Log"}
 
 	Trace = log.New(msger, "<h1>Trace</h1>", log.LstdFlags|log.Llongfile)
@@ -217,12 +217,12 @@ func InitLogging() {
 
 }
 
-func CheckSensors()  {
+func CheckSensors() {
 
-	for i :=  range lastTimes {
+	for i := range lastTimes {
 		if time.Since(lastTimes[i]) > 4*time.Hour {
 
-			Error.Printf("<h2> Sensor %v Missing </h2> Last time online : %v \n Duration : %v ", i, lastTimes[i],time.Since(lastTimes[i]))
+			Error.Printf("<h2> Sensor %v Missing </h2> Last time online : %v \n Duration : %v ", i, lastTimes[i], time.Since(lastTimes[i]))
 
 		}
 	}
@@ -231,12 +231,12 @@ func CheckSensors()  {
 
 func main() {
 	defer panicLogger()
-	lastTimes = make([]time.Time,5)
-	for i:= range lastTimes {
+	lastTimes = make([]time.Time, 5)
+	for i := range lastTimes {
 		lastTimes[i] = time.Now()
 	}
 
-	ticker := time.NewTicker(2* time.Hour);
+	ticker := time.NewTicker(2 * time.Hour)
 
 	go func() {
 		for t := range ticker.C {
@@ -247,7 +247,7 @@ func main() {
 
 	sensordata.Init()
 	InitLogging()
-	//Info.Printf("<h2>Sensor Log Server has Started</h2> Loaded %v datapoints from storage", sensordata.CountAll())
+	Info.Printf("<h2>Sensor Log Server has Started</h2> Loaded %v datapoints from storage", sensordata.CountAll())
 
 	http.HandleFunc("/", http.NotFound)
 	http.HandleFunc("/put", putHandler)
