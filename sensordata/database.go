@@ -12,8 +12,6 @@ import (
 
 type Store [][]SensorWert
 
-
-
 const filename = "database.gob"
 
 var storage Store
@@ -107,6 +105,10 @@ func GetPart(sensor int, timestart time.Time, timeend time.Time) []SensorWert {
 
 func Summit(sensor int, timestart time.Time, timeend time.Time, deltaseconds int) []SensorWert {
 	data := GetPart(sensor, timestart, timeend)
+
+	if len(data) == 0 {
+		return data
+	}
 
 	var out []SensorWert
 	sum := data[0]
