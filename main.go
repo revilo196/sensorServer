@@ -207,7 +207,7 @@ func InitLogging() {
 
 	msger := writemail.MailMsg{Account: account,
 		Name:    "Creapolis Server Log",
-		To:      []string{"oli1111@web.de", "oliver.walter@stud.hs-coburg.de", "Daniel.Melzer@stud.hs-coburg.de"},
+		To:      []string{"xxx@cre.de"},
 		Subject: "Server Log"}
 
 	Trace = log.New(msger, "<h1>Trace</h1>", log.LstdFlags|log.Llongfile)
